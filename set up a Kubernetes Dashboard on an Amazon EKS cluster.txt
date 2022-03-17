@@ -1,0 +1,213 @@
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+N-O-T-E: 
+Create the cluster with role/CrossAccountSignin
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+-- set up a Kubernetes Dashboard on an Amazon EKS cluster
+
+Set up your environment
+
+1.    Install kubectl and aws-iam-authenticator.
+
+2.    To configure your kubeconfig file to point to the Amazon EKS control plane, run the following command:
+
+	----$ aws eks update-kubeconfig --name EKS_ClusterName
+	
+	$ aws eks update-kubeconfig --name qa-elevatetelematics-ms
+	Updated context arn:aws:eks:us-east-1:567234402044:cluster/dev-elevatetelematics-ms in D:\Users\AAjayi\.kube\config
+
+
+3.    Verify that worker nodes are running in the environment:
+
+	----$ kubectl get nodes
+
+AAjayi@EC2AMAZ-BI244HL MINGW64 ~/telematics.alert-api (main)
+$ ~/kubectl get nodes
+NAME                                   STATUS   ROLES    AGE     VERSION
+ip-10-219-192-173.ad.hercrentals.com   Ready    <none>   3d14h   v1.21.4-eks-033ce7e
+ip-10-219-194-209.ad.hercrentals.com   Ready    <none>   3d14h   v1.21.4-eks-033ce7e
+
+
+4.    To verify that the Kubernetes service is running in your environment, run the following command:
+
+	----$ kubectl get svc
+
+AAjayi@EC2AMAZ-BI244HL MINGW64 ~/telematics.alert-api (main)
+$ ~/kubectl get svc
+NAME                            TYPE           CLUSTER-IP       EXTERNAL-IP                                                              PORT(S)        AGE
+alertapi-microservice-service   LoadBalancer   172.20.140.165   abc8672006c5540ad9463f0ced967019-655916215.us-east-1.elb.amazonaws.com   80:32233/TCP   2d22h
+kubernetes                      ClusterIP      172.20.0.1       <none>                                                                   443/TCP        3d14h
+
+
+
+Deploy the Kubernetes Dashboard (web UI)
+
+Prerequisites
+Assumptions:
+
+You have created an Amazon EKS cluster by following the steps in Getting started with Amazon EKS.
+
+You have the Kubernetes Metrics Server installed. For more information, see Installing the Kubernetes Metrics Server.
+
+The security groups for your control plane elastic network interfaces and nodes follow the recommended settings in Amazon EKS security group considerations.
+
+You are using a kubectl client that is configured to communicate with your Amazon EKS cluster.
+
+
+
+Installing the Kubernetes Metrics Server
+
+1. Deploy the Metrics Server
+
+	----kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+AAjayi@EC2AMAZ-BI244HL MINGW64 ~/telematics.alert-api (main)
+$ ~/kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+
+
+2. Verify that the metrics-server deployment is running the desired number of pods with the following command.
+
+	----kubectl get deployment metrics-server -n kube-system
+
+AAjayi@EC2AMAZ-BI244HL MINGW64 ~/telematics.alert-api (main)
+$ ~/kubectl get deployment metrics-server -n kube-system
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+metrics-server   0/1     1            0           22s
+
+
+
+Step 1: Deploy the Kubernetes dashboard
+
+	----kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.5/aio/deploy/recommended.yaml
+
+$ ~/kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.5/aio/deploy/recommended.yaml
+namespace/kubernetes-dashboard created
+serviceaccount/kubernetes-dashboard created
+service/kubernetes-dashboard created
+secret/kubernetes-dashboard-certs created
+secret/kubernetes-dashboard-csrf created
+secret/kubernetes-dashboard-key-holder created
+configmap/kubernetes-dashboard-settings created
+role.rbac.authorization.k8s.io/kubernetes-dashboard created
+clusterrole.rbac.authorization.k8s.io/kubernetes-dashboard created
+rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+deployment.apps/kubernetes-dashboard created
+service/dashboard-metrics-scraper created
+deployment.apps/dashboard-metrics-scraper created
+
+
+****
+NodePort: 32580
+NodePort: 31232 - original
+
+Step 2: Create an eks-admin service account and cluster role binding
+
+----1. Create a file called eks-admin-service-account.yaml with the text below
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eks-admin
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: eks-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: eks-admin
+  namespace: kube-system
+
+
+----2. Apply the service account and cluster role binding to your cluster.
+
+
+$ ~/kubectl apply -f eks-admin-service-account.yaml
+serviceaccount/eks-admin created
+Warning: rbac.authorization.k8s.io/v1beta1 ClusterRoleBinding is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 ClusterRoleBinding
+clusterrolebinding.rbac.authorization.k8s.io/eks-admin created
+
+
+
+
+Step 3: Connect to the dashboard
+
+~/kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep eks-admin | awk '{print $1}')
+
+
+Name:         eks-admin-token-7hb5t
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: eks-admin
+              kubernetes.io/service-account.uid: 0104bed3-0d33-49a6-b763-b6877fd6f8d9
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+ca.crt:     1066 bytes
+namespace:  11 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6ImtpLXU1QkJKM1NMdXd6UHhicVcydm53OEZSR1FydTNzcWpDZDRlZ0xUZVkifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJla3MtYWRtaW4tdG9rZW4tN2hiNXQiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZWtzLWFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiMDEwNGJlZDMtMGQzMy00OWE2LWI3NjMtYjY4NzdmZDZmOGQ5Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmVrcy1hZG1pbiJ9.iF_OR2AxIoCLVbHNpftkvhgTrt_1WqPER7gLlII8GVxyfXIOpvWf99JhTzWuBi5V8UEUKoCnrzYGegWeko3KVbpe69lRlkDYwl4LbiMF_ofjiPgluGo_e5hIA6AIrsx95L7xynyU-fgCW3hZ-9PH2Bu42iawErJ7yMCuSybCVSJm36D8YkcsuBNgVsL7VMzWIAxGCFJNq3ybL8TF9YBU-QYcK8mJGJIXgVg0GkkKF2mZkfcWIR_Kq8DbLKwQ6CKU4B0wOJgynIns3bB0QON-Y72iisq2RtugMTAe9GYta7wOWdHjNcN6DiTCSV_lbhIl_Ty-0fVzIs9IbAxXZjrARg
+
+
+dev-Cluster2:
++++++++++
+
+Name:         eks-admin-token-bx65l
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: eks-admin
+              kubernetes.io/service-account.uid: 1d3ff83b-0a88-4eaf-81af-9415b0b3df5f
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+ca.crt:     1066 bytes
+namespace:  11 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IkhEeUZLdWxGdkpYclpOYlE5cFJ1djBDeExnMEZucnFiRkpkRWhaYW1pUjQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJla3MtYWRtaW4tdG9rZW4tYng2NWwiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZWtzLWFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiMWQzZmY4M2ItMGE4OC00ZWFmLTgxYWYtOTQxNWIwYjNkZjVmIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmVrcy1hZG1pbiJ9.w96wAAqqAyaJeylDFgWznKd-ockqnz0kK5o-1_uJQJuxJ4EAr7o-31fsQffF73cHztkgQFTS29bZJcVVgN4yFDlwtCDPvADZVazjoSlfbtjgzVJ77Fv4B2QnQ6pDUiwApAYiCtCkqH-NQoMzKVuaSlF3FNLJfxCOBcn5EK_Dlex381Vq9JsmIpVqOsp3Lj5RBdGRPSxlaGuSwedkGYVR5jkd2mNbghVBwlhHmPhCD5bZ2jaEL-fpB8Xi2aenz4w6r6FhyydPuf3mbIuWSsCv6D2RLh4vBkZtvnGYJ8R87Y-VRr8hv03wEeVLKDIOztZgJpgyydApOD0LBww7uMVfog
+
+
+qa-cluster:
++++++++++++
+
+Name:         eks-admin-token-g9z75
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: eks-admin
+              kubernetes.io/service-account.uid: 80f063cf-0fb1-4ecd-a6fd-ca47f38062ea
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6ImhneVpuTGYxb0RuQkU0OWFLbFh2ZUxCZVJfd2V0V0dRVXdxcG5TYnVGLVEifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJla3MtYWRtaW4tdG9rZW4tZzl6NzUiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZWtzLWFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiODBmMDYzY2YtMGZiMS00ZWNkLWE2ZmQtY2E0N2YzODA2MmVhIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmVrcy1hZG1pbiJ9.Apjh5dQkzZy8TsahrAC-hEGf5_rPpByO7lUEL8fBi5FePPtC-qQhU7WoEyOe_c1VJFwRKt_ue2Tf0hLLWcVoCva590IXj8n8imzBvd2DJKmPH-BWUnN8wpkq63E4qlq5c-7DpVgxt9C45LASxUCkLbokUYCJvfajGdXXrTQ45wOjEkxM1jCrYCUqqI6-xKc44W-PqELOWFbQpZqyqEFRAP1DDBj0u3L8xwcYRjLx06DikUK_VX03oCb2cZivB7lBNpQC9yJiX4AoA-iZQP2J1UJgFPhFeJixeHiD6wQuLFIJ8GyouLWbE9UxxzI2G-xbG6dQGmhAnWAjRvDJF0gFmw
+ca.crt:     1066 bytes
+namespace:  11 bytes
+
+
+
+HOW TO SWITCH   TO NEW CLUSTER - QA CLUSTER
++++++++++++++++++++++++++++++++++++++++++++
+
+$ aws eks update-kubeconfig --name qa-elevatetelematics-ms-1
+Updated context arn:aws:eks:us-east-1:567234402044:cluster/qa-elevatetelematics-ms-1 in D:\Users\AAjayi\.kube\config
+
+
+$ aws eks update-kubeconfig --name qa-elevatetelematics-ms-1 --region us-east-1 --role-arn arn:aws:iam::567234402044:role/CrossAccountSignin
+Updated context arn:aws:eks:us-east-1:567234402044:cluster/qa-elevatetelematics-ms-1 in D:\Users\AAjayi\.kube\config

@@ -10,3 +10,10 @@ kubectl describe configmap -n kube-system aws-auth
 
 https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html
 
+RBAC, Cluster Role Binding and Service Account
+
+https://github.com/RobinNagpal/kubernetes-tutorials/blob/master/06_tools/007_alb_ingress/01_eks/Makefile
+
+https://github.com/RobinNagpal/kubernetes-tutorials/tree/master/06_tools/007_alb_ingress/01_eks
+
+https://www.youtube.com/watch?v=S8U7A-eGdOs&t=582s

@@ -45,3 +45,21 @@ spec:
     port: 443
     targetPort: 8080
   type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lighttowerapi-microservice-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:{region}:{user id}:certificate/{id}
+spec:
+  selector:
+    app: lighttowerapi
+    environment: Dev
+  ports:
+  - protocol: TCP
+    name: https
+    port: 443
+    targetPort: 80
+  type: LoadBalancer

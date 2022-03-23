@@ -1,0 +1,134 @@
+# https://docs.digitalocean.com/products/kubernetes/how-to/configure-load-balancers/
+
+. . .
+metadata:
+  name: name-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-name: "my.example.com"
+. . .
+
+. . .
+metadata:
+  name: https-protocol-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "1234-5678-9012-3456"
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "https"
+. . .
+
+metadata:
+  name: sticky-session-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-sticky-sessions-type: "cookies"
+    service.beta.kubernetes.io/do-loadbalancer-sticky-sessions-cookie-name: "example"
+    service.beta.kubernetes.io/do-loadbalancer-sticky-sessions-cookie-ttl: "60"
+    
+...
+metadata:
+  name: health-check-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: "80"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-check-interval-seconds: "3"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-response-timeout-seconds: "5"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-unhealthy-threshold: "3"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-healthy-threshold: "5"
+    
+...
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: https-with-cert
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "https"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "your-certificate-id"
+    service.beta.kubernetes.io/do-loadbalancer-disable-lets-encrypt-dns-records: "false"
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-example
+  ports:
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 80
+. . .
+
+. . .
+  name: https-with-redirect-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-tls-ports: "443"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "your-certificate-id"
+    service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https: "true"
+  spec:
+    type: LoadBalancer
+    selector:
+      app: nginx-example
+    ports:
+      - name: http
+        protocol: TCP
+        port: 80
+        targetPort: 80
+      - name: https
+        protocol: TCP
+        port: 443
+        targetPort: 80
+. . .
+---
+. . .
+metadata:
+  name: proxy-protocol
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
+. . .
+---
+. . .
+metadata:
+  name: backend-keepalive
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-enable-backend-keepalive: "true"
+. . .
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: hello
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "1234-5678-9012-3456"
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "https"
+    service.beta.kubernetes.io/do-loadbalancer-hostname: "hello.example.com"
+spec:
+  type: LoadBalancer
+  selector:
+    app: my-app-example
+  ports:
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 80
+. . .
+. . .
+metadata:
+  name: http-ports-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-http-ports: "80"
+. . .
+. . .
+metadata:
+  name: tls-ports-snippet
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-tls-ports: "443"
+    service.beta.kubernetes.io/do-loadbalancer-tls-passthrough: "true"
+. . .
+
+. . .
+metadata:
+  name: nginx
+  annotations:
+    kubernetes.digitalocean.com/load-balancer-id: "your-load-balancer-id"
+    service.beta.kubernetes.io/do-loadbalancer-size-unit: "3"
+    service.beta.kubernetes.io/do-loadbalancer-disable-lets-encrypt-dns-records: "false"
+. . .
